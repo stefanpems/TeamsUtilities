@@ -1,6 +1,6 @@
 ﻿<#
   .VERSION AND AUTHOR
-    Script version: v-2020.08.02
+    Script version: v-2020.09.13
     Author: Stefano Pescosolido, https://www.linkedin.com/in/stefanopescosolido/
     Script published in GitHub: https://github.com/stefanpems/TeamsUtilities
 
@@ -32,14 +32,23 @@
 # VARIABLES TO BE SET:
 #########################################################################################################################
 
-$csvTeams = "C:\Temp\IN\Team.csv"           #EXPECTED COLUMNS: "Team NN","Team DN" - EXPECTED COLUMN DELIMITER: "," 
-$csvOwners = "C:\Temp\IN\Team-Owner.csv"    #EXPECTED COLUMNS: "Team NN","Owner" - EXPECTED COLUMN DELIMITER: "," 
-$csvUsers = "C:\Temp\IN\Team-User.csv"      #EXPECTED COLUMNS: "Team NN","User" - EXPECTED COLUMN DELIMITER: "," 
-$outDirPath = "c:\Tem\OUTs" #Set the correct path!
-$adminName = "adminName@schoolname.edu" #Set the correct name! NOTE: must be pre-assigned a license including Teams!
-    #RECOMMENDATION: do not use a "personal" account as $adminName. This name appears in the first screen of every 
-    #created Teams.
+$csvTeams = "C:\Temp\Team.csv"           #EXPECTED COLUMNS: "Team NN","Team DN" 
+$csvOwners = "C:\Temp\Team-Owner.csv"    #EXPECTED COLUMNS: "Team NN","Owner" 
+$csvUsers = "C:\Temp\Team-User.csv"      #EXPECTED COLUMNS: "Team NN","User" 
+$delimiter = ";" #Set the correct value of the delimeter in all the 3 CSV files
+$outLogDir = "C:\Temp\OUT" #Set the correct path!
+$adminName = "admin@schoolname.edu" #Set the correct name! 
+    #NOTES for this account: 
+    #1) This account must already have assigned a license including Teams
+    #2) RECOMMENDATION: do not use a "personal" account as $adminName. This name appears in the home screen in the general channel
+    #   of every created created Team.
+    #3) ATTENTION: this script does not remove this account from the list of the owners of each created team.
+    #   It's important to consider that a single account can be member of at most 1000 teams. 
+    #   Please consider this limit. If the account $adminName is already in many other teams or if you are adding more than 1000 teams
+    #   you can evaluate the option to add in the code below the removal of the account from each created team or you can 
+    #   use a new administrative account or split the execution with different administrative accounts. 
 $testOnly = $false #Set the desired value
+
 
 function CreateEduTeam{
 
@@ -189,245 +198,198 @@ else{
 Write-Host "Creato il file di log '$oFile'" -ForegroundColor Yellow
 
 $errCount = 0;
-$brkOuter = $false;
-$consecErrs = 0;
-#Lettura CSV dei Team
-Import-Csv -Path $csvTeams | ForEach-Object {
-    $skipUsers = $false;
 
-    #Ricerca del Team 
-    $tnn = $($_."Team NN")
-    $tdn = $($_."Team DN")
+
+#Lettura CSV dei Team
+$teamsRows  = Import-Csv -Path $csvTeams -Delimiter $delimiter
+$numRows = $teamsRows.Count
+$currRow = 0
+
+:TeamsLoop
+ForEach ($teamRow in $teamsRows){    
+
+    #Progress bar
+    $currRow++;
+    $percentComplete = [math]::Round(100*$currRow/$numRows,1)
+    Write-Progress -Activity "Scanning rows" -Status "$percentComplete % rows processed" -PercentComplete $percentComplete
+
+    #Searching for the Team 
+    $tnn = $teamRow."Team NN"
+    $tdn = $teamRow."Team DN"
     
     Write-Host "Searching for the team: " $tnn "-" $tdn
-    "Cerco il team: $tnn - $tdn" | Out-File $oFile -Append
+    "Searching for the team: $tnn - $tdn" | Out-File $oFile -Append
 
-    $group = Get-Team -MailNickname $tnn
+    try{
 
-    if($group -eq $null){
+        $group = Get-Team -MailNickname $tnn
 
-        $tokenExpiration = $accessToken.ValidTo.ToLocalTime().AddMinutes(-1);
-        $TimeToExpiry = $tokenExpiration - (Get-Date)        
-        $sTimeToExpiry = $TimeToExpiry.Minutes.ToString() + " min " + $TimeToExpiry.Seconds.ToString() + " sec"
-                
-        Write-Host "  Token - TimeToExpiry: " $sTimeToExpiry
-        "  Token - TimeToExpiry: '$sTimeToExpiry'" | Out-File $oFile -Append            
+        if($group -eq $null){
 
-        $IsExpired = (Get-Date) -gt $tokenExpiration   
-
-        if($IsExpired){
-            Write-Host "  Token expired! Acquiring a new token" -ForegroundColor Cyan 
-            "  Token expired! Acquiring a new token." | Out-File $oFile -Append     
-            
-            $accessToken = $null;
-            
-            try{
-                Connect-PnPOnline -Scopes $arrayOfScopes 
-                $accessToken = Get-PnPAccessToken -Decoded      
-            }
-            catch{
-                Write-Host "  Could not acquire a new token. Forced exit!" -ForegroundColor Red 
-                "  Could not acquire a new token. Forced exit!" | Out-File $oFile -Append     
-                Exit
-            }
-
-            $tokenExpiration = $accessToken.ValidTo.ToLocalTime();
+            $tokenExpiration = $accessToken.ValidTo.ToLocalTime().AddMinutes(-1);
             $TimeToExpiry = $tokenExpiration - (Get-Date)        
             $sTimeToExpiry = $TimeToExpiry.Minutes.ToString() + " min " + $TimeToExpiry.Seconds.ToString() + " sec"
                 
-            Write-Host "  New Token - TimeToExpiry: " $sTimeToExpiry
-            "  New Token - TimeToExpiry: '$sTimeToExpiry'" | Out-File $oFile -Append            
+            Write-Host "  Token - TimeToExpiry: " $sTimeToExpiry
+            "  Token - TimeToExpiry: '$sTimeToExpiry'" | Out-File $oFile -Append            
 
-        }
+            $IsExpired = (Get-Date) -gt $tokenExpiration   
+
+            if($IsExpired){
+                Write-Host "  Token expired! Acquiring a new token" -ForegroundColor Cyan 
+                "  Token expired! Acquiring a new token." | Out-File $oFile -Append     
+            
+                $accessToken = $null;
+            
+                try{
+                    Connect-PnPOnline -Scopes $arrayOfScopes 
+                    $accessToken = Get-PnPAccessToken -Decoded      
+                }
+                catch{
+                    Write-Host "  Could not acquire a new token. Forced exit!" -ForegroundColor Red 
+                    "  Could not acquire a new token. Forced exit!" | Out-File $oFile -Append     
+                    Break TeamsLoop
+                }
+
+                $tokenExpiration = $accessToken.ValidTo.ToLocalTime();
+                $TimeToExpiry = $tokenExpiration - (Get-Date)        
+                $sTimeToExpiry = $TimeToExpiry.Minutes.ToString() + " min " + $TimeToExpiry.Seconds.ToString() + " sec"
+                
+                Write-Host "  New Token - TimeToExpiry: " $sTimeToExpiry
+                "  New Token - TimeToExpiry: '$sTimeToExpiry'" | Out-File $oFile -Append            
+
+            }
      
-        if(-not($testOnly)){
-            #CHANGE - Provisioning of the new Team by using GraphAPI
-            try{
-                CreateEduTeam -TeamName $tnn -TeamDescription $tdn -accessToken $accessToken.RawData
-            }
-            catch{
-                $errCount++;
-                $consecErrs++;
-                Write-Host "ERROR while creating the team '" $tnn "': " $_.Exception.Message "'" -ForegroundColor Red 
-                "  ERROR while creating the team: '$tnn'" | Out-File $oFile -Append
-
-                if($consecErrs -ge 10){
-                    break;
+            if(-not($testOnly)){
+                #CHANGE - Provisioning of the new Team by using GraphAPI
+                try{
+                    CreateEduTeam -TeamName $tnn -TeamDescription $tdn -accessToken $accessToken.RawData
                 }
-                else{
-                    #continue; --> Doesn't work in inner loop
-                    $skipUsers = $true;
-                }
-            }
+                catch{
+                    $errCount++;
+                    Write-Host "ERROR while creating the team '" $tnn "': " $_.Exception.Message "'" -ForegroundColor Red 
+                    "  ERROR while creating the team: '$tnn'" | Out-File $oFile -Append
 
-            if(-not($skipUsers)){
+                    throw
+                }
+
                 #Accessing the new team 
                 $group = Get-Team -MailNickname $tnn
                 if($group){
                     $gnn = $group.MailNickName
                     Write-Host "  New team created and successfully accessed: " $gnn
                     "  New team created and successfully accessed: '$gnn'" | Out-File $oFile -Append
-                    $consecErrs = 0; 
                 }
                 else{
                     $errCount++;
-                    $consecErrs++;
                     Write-Host "ERROR while searching the new team: " $tnn -ForegroundColor Red 
                     "  ERROR while searching the new team: '$tnn'" | Out-File $oFile -Append
                 
-                    if($consecErrs -ge 10){
-                        break;
-                    }
-                    else{
-                        continue;
-                    }
+                    throw
                 }
+            }
+            else{
+                Write-Host "  Simulated - Created the new team: " $tnn
+                "  Simulated - Created the new team: $tnn" | Out-File $oFile -Append
             }
         }
         else{
-            Write-Host "  Simulated - Created the new team: " $tnn
-            "  Simulated - Created the new team: $tnn" | Out-File $oFile -Append
+            Write-Host "  The team already exists: " $group.MailNickName
+            "  The team already exists: $tnn" | Out-File $oFile -Append
         }
+    
     }
-    else{
-        Write-Host "  The team already exists: " $group.MailNickName
-        "  The team already exists: $tnn" | Out-File $oFile -Append
+    catch{
+        Write-Host "Skipping the team '" $tnn "' " -ForegroundColor Red 
+        "  Skipping the team: '$tnn'" | Out-File $oFile -Append
+
+        continue TeamsLoop #STOP executing the following actions for this team!
     }
 
-    if(-not($skipUsers)){
-        try{        
-            #Reading the Team owners
-            $consecErrs = 0
-            Import-Csv -Path $csvOwners | 
-            Where-Object -Property "Team NN" -eq $($_."Team NN") | ForEach-Object {
-            
-                $oUPN = $($_.Owner)
+    #Reading the Team owners
+    $ownersRows = Import-Csv -Path $csvOwners  -Delimiter $delimiter | 
+    Where-Object -Property "Team NN" -eq $tnn 
+
+    :OwnersLoop
+    Foreach($ownerRow in $ownersRows){            
+        $oUPN = $ownerRow."Owner"
                 
-                #Cycle for handling temporary errors
-                $count = 1;
-                do { 
-                    $done=$false;
-                    try{
-                        $oObj = Get-AzureADUser -Filter "UserPrincipalName eq '$oUPN'"
+        try{
+            $oObj = Get-AzureADUser -Filter "UserPrincipalName eq '$oUPN'"
 
-                        if($oObj){
-                            Write-Host "  Setting the user as team owner ($count): " $oUPN -ForegroundColor Green
-                            "  Setting the user as team owner ($count): $oUPN" | Out-File $oFile -Append
+            if($oObj){
+                Write-Host "  Setting the user as team owner: " $oUPN -ForegroundColor Green
+                "  Setting the user as team owner: $oUPN" | Out-File $oFile -Append
                         
-                            if(-not($testOnly)){
-                                #CHANGE - Setting the user as team owner
-                                Add-TeamUser -GroupId $group.GroupId -User $oUPN -Role Owner 
-                            }
-                            $done=$true;
-                        }
-                        else{
-                            Write-Host "  User to be set as owner not found in Azure AD ($count): " $oUPN -ForegroundColor Yellow
-                            "  User to be set as owner not found in Azure AD ($count): $oUPN" | Out-File $oFile -Append
-                            $count++;
-                        }
-	                }
-                    catch{
-                        Start-Sleep -s 5
-                        $count++;
-                    }
+                if(-not($testOnly)){
+                    #CHANGE - Setting the user as team owner
+                    Add-TeamUser -GroupId $group.GroupId -User $oUPN -Role Owner 
                 }
-                While (($done -eq $false) -and ($count -le 20)) 
-
-                if($done -eq $false){
-                    $errCount++;
-                    $consecErrs++;
-                    Write-Host "  ERROR (" $errCount ") - Cannot set the user as owner of the Team $oUPN" -ForegroundColor Red
-                    "  ERROR ($errCount) - Cannot set the user as owner of the Team: $oUPN" | Out-File $oFile -Append
-
-                    if($consecErrs -ge 10){
-                        Write-Host "  EXECUTION STOPPED (" $consecErrs " consecutive errors)" -ForegroundColor DarkRed -BackgroundColor Yellow
-                        "  EXECUTION STOPPED ($consecErrs consecutive errors)" | Out-File $oFile -Append  
-                        $brkOuter = $true;  
-                        break;                
-                    }
-                }  
-                else{
-                    $consecErrs = 0; 
-                }
+                $done=$true;
             }
-
-            if($brkOuter){
-                break;
+            else{
+                Write-Host "  User to be set as owner not found in Azure AD: " $oUPN -ForegroundColor Yellow
+                "  User to be set as owner not found in Azure AD: $oUPN" | Out-File $oFile -Append                        
             }
-
-            #Reading the Team Members
-            $consecErrs = 0
-            Import-Csv -Path $csvUsers | 
-            Where-Object -Property "Team NN" -eq $($_."Team NN") | ForEach-Object {
-            
-                $mUPN = $($_.User)
-                
-                #Cycle for handling temporary errors
-                $count = 1;
-                do { 
-                    $done=$false;
-                    try{
-                        $mObj = Get-AzureADUser -Filter "UserPrincipalName eq '$mUPN'"
-
-                        if($mObj){
-                            Write-Host "  Setting the user as team member ($count): " $mUPN -ForegroundColor Green
-                            "  Setting the user as team member ($count): $mUPN" | Out-File $oFile -Append
-
-                            if(-not($testOnly)){
-                                #CHANGE - Setting the user as team member
-                                Add-TeamUser -GroupId $group.GroupId -User $mUPN -Role Member
-                            }
-                            $done=$true;
-                        }
-                        else{
-                            Write-Host "  User to be set as member not found in Azure AD ($count): " $mUPN -ForegroundColor Yellow
-                            "  User to be set as member not found in Azure AD ($count): $mUPN" | Out-File $oFile -Append
-                            $count++;
-                        }
-	                }
-                    catch{
-                        Start-Sleep -s 5
-                        $count++;
-                    }
-                } 
-                While (($done -eq $false) -and ($count -le 20))
-
-                if($done -eq $false){
-                    $errCount++;
-                    $consecErrs++;
-                    Write-Host "  ERRORE (" $errCount ") - Cannot set the user as member of the Team $mUPN" -ForegroundColor Red
-                    "  ERRORE ($errCount) - Cannot set the user as member of the Team: $mUPN" | Out-File $oFile -Append
-
-                    if($consecErrs -ge 10){
-                        Write-Host "  EXECUTION STOPPED (" $consecErrs " consecutive errors)" -ForegroundColor DarkRed -BackgroundColor Yellow
-                        "  EXECUTION STOPPED ($consecErrs consecutive errors)" | Out-File $oFile -Append    
-                        break;                
-                    }
-                } 
-                else{
-                    $consecErrs = 0; 
-                }
-            }
-
-	        $oldgdn = $group.DisplayName
-            Write-Host "  Changing the Display Name of the Team from '" $oldgdn "' to '" $tdn "'"
-            "  Changing the Display Name of the Team from '$oldgdn' to '$tdn'"| Out-File $oFile -Append 
-        
-            if(-not($testOnly)){
-                #CHANGE - Changing the Display Name of the Team 
-                Set-Team -GroupId $group.GroupId -DisplayName $tdn -Description "Lezioni di $tdn" | Out-Null
-            }
-
-            if($brkOuter){
-                break;
-            }
-        }
+	    }
         catch{
             $errCount++;
-            Write-Host "ERROR (" $errCount ") - Team " $tnn " - " $_.Exception.Message -ForegroundColor DarkRed -BackgroundColor Yellow
-            "  ERROR ($errCount) - Team $tnn - $_.Exception.Message"| Out-File $oFile -Append 
+            Write-Host "  ERROR (" $errCount ") - Cannot set the user as owner of the Team $oUPN" -ForegroundColor Red
+            "  ERROR ($errCount) - Cannot set the user as owner of the Team: $oUPN" | Out-File $oFile -Append               
+        }
+
+    }
+
+    #Reading the Team Members
+    $membersRows = Import-Csv -Path $csvUsers  -Delimiter $delimiter | 
+    Where-Object -Property "Team NN" -eq $tnn # $($_."Team NN")
+
+    :MembersLoop
+    Foreach($memberRow in $membersRows){           
+        $mUPN = $memberRow."User"
+                
+        try{
+            $mObj = Get-AzureADUser -Filter "UserPrincipalName eq '$mUPN'"
+
+            if($mObj){
+                Write-Host "  Setting the user as team member: " $mUPN -ForegroundColor Green
+                "  Setting the user as team member: $mUPN" | Out-File $oFile -Append
+
+                if(-not($testOnly)){
+                    #CHANGE - Setting the user as team member
+                    Add-TeamUser -GroupId $group.GroupId -User $mUPN -Role Member
+                }
+                $done=$true;
+            }
+            else{
+                Write-Host "  User to be set as member not found in Azure AD: " $mUPN -ForegroundColor Yellow
+                "  User to be set as member not found in Azure AD: $mUPN" | Out-File $oFile -Append                        
+            }
+	    }
+        catch{
+            $errCount++;
+            Write-Host "  ERRORE (" $errCount ") - Cannot set the user as member of the Team $mUPN" -ForegroundColor Red
+            "  ERRORE ($errCount) - Cannot set the user as member of the Team: $mUPN" | Out-File $oFile -Append
+        }
+
+    }
+
+    try{       
+	    $oldgdn = $group.DisplayName
+        Write-Host "  Changing the Display Name of the Team from '" $oldgdn "' to '" $tdn "'"
+        "  Changing the Display Name of the Team from '$oldgdn' to '$tdn'"| Out-File $oFile -Append 
+        
+        if(-not($testOnly)){
+            #CHANGE - Changing the Display Name of the Team 
+            Set-Team -GroupId $group.GroupId -DisplayName $tdn -Description "Lezioni di $tdn" | Out-Null
         }
     }
+    catch{
+        $errCount++;
+        Write-Host "ERROR (" $errCount ") - Error while changing the Display Name of the Team from '" $oldgdn "' to '" $tdn "'" " - " $_.Exception.Message -ForegroundColor DarkRed -BackgroundColor Yellow
+        "  ERROR ($errCount) - Error while changing the Display Name of the Team $tnn - $_.Exception.Message"| Out-File $oFile -Append 
+    }
+    
 }
 
 if($errCount -gt 0){
