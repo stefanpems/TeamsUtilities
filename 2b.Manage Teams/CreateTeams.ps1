@@ -1,6 +1,6 @@
 ﻿<#
   .VERSION AND AUTHOR
-    Script version: v-2020.09.13
+    Script version: v-2020.09.14
     Author: Stefano Pescosolido, https://www.linkedin.com/in/stefanopescosolido/
     Script published in GitHub: https://github.com/stefanpems/TeamsUtilities
 
@@ -202,7 +202,7 @@ $errCount = 0;
 
 #Lettura CSV dei Team
 $teamsRows  = Import-Csv -Path $csvTeams -Delimiter $delimiter
-$numRows = $teamsRows.Count
+$numRows = $teamsRows.Count; if($numRows -eq $null) {$numRows = 1}
 $currRow = 0
 
 :TeamsLoop
