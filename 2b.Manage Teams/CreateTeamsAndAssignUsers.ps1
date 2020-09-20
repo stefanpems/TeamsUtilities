@@ -6,6 +6,12 @@
 
   .SYNOPSIS
     This script massively creates Teams and assign to them members and owners as specified in the 2 input CSV files.
+    For each specified team, if it already exsists, the script only update the membership.
+    For each specified member/owner, if she/he has already the required role, no action is done.
+    The script generate 3 output files:
+     * A verbose log
+     * A verbose csv with all the actions done and their results
+     * A summary csv with all the teams for which at least an error was recorded; this file is useful if you want to run the script again only for the failed teams.
 
   .PREREQUISITES
    * Use Windows 10 (For earlier versions of Windows, please refer to https://docs.microsoft.com/en-us/microsoft-365/enterprise/connect-to-all-microsoft-365-services-in-a-single-windows-powershell-window?view=o365-worldwide#before-you-begin)
