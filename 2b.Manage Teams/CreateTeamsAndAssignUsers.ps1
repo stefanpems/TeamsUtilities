@@ -38,8 +38,13 @@
 # VARIABLES TO BE SET:
 #########################################################################################################################
 
-$csvTeams = "C:\Temp\IN\Team.csv"           #EXPECTED COLUMNS: "Team NN","Team DN" 
-$csvUsers = "C:\Temp\IN\Team-User.csv"      #EXPECTED COLUMNS: "Team NN","User","Role" 
+$csvTeams = "C:\Temp\IN\Team.csv"           #EXPECTED COLUMNS: "Team NN","Team DN" -> Team NickName and Team Display Name
+                                            #NOTE: In the Team NN do not use special characters. 
+                                            #      For schools, we recommend to add the school year as prefix.
+                                            #      Example of row: "as2021-1A-italian;1A Italian Language and Culture"
+$csvUsers = "C:\Temp\IN\Team-User.csv"      #EXPECTED COLUMNS: "Team NN","User","Role" -> Team NickName, LoginName of the User to be added, Role for the user to be added
+                                            #NOTE: the expected values in the column "Role" are "Member" or "Owner".
+                                            #      Example of row: "as2021-1A-italian;xxx@schoolName.edu;Member"
 $delimiter = ";" #Set the correct value 
 $outLogDir = "C:\Temp\OUT" #Set the correct path!
 
