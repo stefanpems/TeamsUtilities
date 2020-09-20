@@ -1,4 +1,7 @@
 ﻿<#
+  The use of this script is now DEPRECATED!
+  Use GetUsersAndBelongingGroups.ps1 instead.
+
   .VERSION AND AUTHOR
     Script version: v-2020.05.06
     Author: Stefano Pescosolido, https://www.linkedin.com/in/stefanopescosolido/
