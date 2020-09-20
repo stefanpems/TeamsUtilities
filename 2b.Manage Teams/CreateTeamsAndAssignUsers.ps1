@@ -1,11 +1,11 @@
 ﻿<#
   .VERSION AND AUTHOR
-    Script version: v-2020.09.14
+    Script version: v-2020.09.20
     Author: Stefano Pescosolido, https://www.linkedin.com/in/stefanopescosolido/
     Script published in GitHub: https://github.com/stefanpems/TeamsUtilities
 
   .SYNOPSIS
-    This script massively creates Teams and assign to them members and owners as specified in the 3 CSV files specified in input.
+    This script massively creates Teams and assign to them members and owners as specified in the 2 input CSV files.
 
   .PREREQUISITES
    * Use Windows 10 (For earlier versions of Windows, please refer to https://docs.microsoft.com/en-us/microsoft-365/enterprise/connect-to-all-microsoft-365-services-in-a-single-windows-powershell-window?view=o365-worldwide#before-you-begin)
@@ -32,23 +32,23 @@
 # VARIABLES TO BE SET:
 #########################################################################################################################
 
-$csvTeams = "C:\Temp\Team.csv"           #EXPECTED COLUMNS: "Team NN","Team DN" 
-$csvOwners = "C:\Temp\Team-Owner.csv"    #EXPECTED COLUMNS: "Team NN","Owner" 
-$csvUsers = "C:\Temp\Team-User.csv"      #EXPECTED COLUMNS: "Team NN","User" 
-$delimiter = ";" #Set the correct value of the delimeter in all the 3 CSV files
+$csvTeams = "C:\Temp\IN\Team.csv"           #EXPECTED COLUMNS: "Team NN","Team DN" 
+$csvUsers = "C:\Temp\IN\Team-User.csv"      #EXPECTED COLUMNS: "Team NN","User","Role" 
+$delimiter = ";" #Set the correct value 
 $outLogDir = "C:\Temp\OUT" #Set the correct path!
-$adminName = "admin@schoolname.edu" #Set the correct name! 
-    #NOTES for this account: 
-    #1) This account must already have assigned a license including Teams
-    #2) RECOMMENDATION: do not use a "personal" account as $adminName. This name appears in the home screen in the general channel
-    #   of every created created Team.
-    #3) ATTENTION: this script does not remove this account from the list of the owners of each created team.
-    #   It's important to consider that a single account can be member of at most 1000 teams. 
-    #   Please consider this limit. If the account $adminName is already in many other teams or if you are adding more than 1000 teams
-    #   you can evaluate the option to add in the code below the removal of the account from each created team or you can 
-    #   use a new administrative account or split the execution with different administrative accounts. 
-$testOnly = $false #Set the desired value
 
+$templateName = "educationClass" 
+    #Known values:
+    # -> Set "educationClass" for creating teams with the template "Class"
+    # -> Set "educationStaff" for creating teams with the template "Staff" ("Personale" in Italian)
+    #Details in https://support.microsoft.com/en-us/office/choose-a-team-type-to-collaborate-in-microsoft-teams-0a971053-d640-4555-9fd7-f785c2b99e67
+
+$adminName = "adminName@schoolName.edu" #Set the correct name! NOTE: must be pre-assigned a license including Teams!
+    #RECOMMENDATION: do not use a "personal" account as $adminName. This name appears in the first screen of every 
+    #created Teams.
+$testOnly = $true #Set the desired value
+
+#########################################################################################################################
 
 function CreateEduTeam{
 
@@ -56,7 +56,9 @@ function CreateEduTeam{
          [string]
          $TeamName, 
          [string]
-         $TeamDescription,
+         $TeamDescription, 
+         [string]
+         $TeamTemplate,
          [string]
          $accessToken
     )
@@ -96,7 +98,7 @@ function CreateEduTeam{
         # Create the team 
         $getTeamFromGraphUrl = "$GraphURL/groups?`$filter=displayName eq '" + $TeamName + "'" 
         $createTeamRequest = @{
-            "template@odata.bind" = "https://graph.microsoft.com/beta/teamsTemplates('educationClass')"
+            "template@odata.bind" = "https://graph.microsoft.com/beta/teamsTemplates('"+$TeamTemplate+"')"
             displayName = $TeamName
             description =  $TeamDescription
 	        memberSettings = @{
@@ -161,7 +163,7 @@ function CreateEduTeam{
     catch
     {
         Write-Host "Error while creating team " $d.TeamName " - " $_.Exception.Message -ForegroundColor Red
-        "  Error while creating team '$d.TeamName': '$_'" | Out-File $oFile -Append
+        "  Error while creating team '$d.TeamName': '$_'" | Out-File $oLogFile -Append
         throw $_
     }
 
@@ -180,24 +182,32 @@ $accessToken = Get-PnPAccessToken -Decoded
 
 $LogStartTime = Get-Date -Format "yyyy-MM-dd_hh.mm.ss"
 if($testOnly){
-	$oFile = "$outLogDir\SIMULATION-CreateTeams_$LogStartTime.log"
+	$oLogFile = "$outLogDir\SIMULATION-CreateTeams_$LogStartTime.log"
+    $oCsvFile = "$outLogDir\SIMULATION-CreateTeams_$LogStartTime.csv"
 }
 else{
-	$oFile = "$outLogDir\CreateTeams_$LogStartTime.log"
+	$oLogFile = "$outLogDir\CreateTeams_$LogStartTime.log"
+    $oCsvFile = "$outLogDir\CreateTeams_$LogStartTime.csv"
 }
-If (Test-Path $oFile)
+If (Test-Path $oLogFile)
 {
-	Remove-Item $oFile
+	Remove-Item $oLogFile
+}
+If (Test-Path $oCsvFile)
+{
+	Remove-Item $oCsvFile
 }
 if($testOnly){
-	"SIMULATED EXECUTION STARTED - $LogStartTime" | Out-File $oFile 
+	"SIMULATED EXECUTION STARTED - $LogStartTime" | Out-File $oLogFile     
 }
 else{
-	"EXECUTION STARTED - $LogStartTime" | Out-File $oFile 
+	"EXECUTION STARTED - $LogStartTime" | Out-File $oLogFile 
 }
 Write-Host "Creato il file di log '$oFile'" -ForegroundColor Yellow
+"Target;Action;Result;Details" | Out-File $oCsvFile 
 
 $errCount = 0;
+$TeamsToBeRepeated = @{}
 
 
 #Lettura CSV dei Team
@@ -214,30 +224,31 @@ ForEach ($teamRow in $teamsRows){
     Write-Progress -Activity "Scanning rows" -Status "$percentComplete % rows processed" -PercentComplete $percentComplete
 
     #Searching for the Team 
-    $tnn = $teamRow."Team NN"
-    $tdn = $teamRow."Team DN"
-    
+    $tnn = $teamRow."Team NN".Trim()
+    $tdn = $teamRow."Team DN".Trim()
+        
     Write-Host "Searching for the team: " $tnn "-" $tdn
-    "Searching for the team: $tnn - $tdn" | Out-File $oFile -Append
+    "Searching for the team: $tnn - $tdn" | Out-File $oLogFile -Append
 
     try{
 
         $group = Get-Team -MailNickname $tnn
 
         if($group -eq $null){
+            $tnn+";"+"Get-Team;Success;Not found" | Out-File $oCsvFile -Append
 
             $tokenExpiration = $accessToken.ValidTo.ToLocalTime().AddMinutes(-1);
             $TimeToExpiry = $tokenExpiration - (Get-Date)        
             $sTimeToExpiry = $TimeToExpiry.Minutes.ToString() + " min " + $TimeToExpiry.Seconds.ToString() + " sec"
                 
             Write-Host "  Token - TimeToExpiry: " $sTimeToExpiry
-            "  Token - TimeToExpiry: '$sTimeToExpiry'" | Out-File $oFile -Append            
+            "  Token - TimeToExpiry: '$sTimeToExpiry'" | Out-File $oLogFile -Append            
 
             $IsExpired = (Get-Date) -gt $tokenExpiration   
 
             if($IsExpired){
                 Write-Host "  Token expired! Acquiring a new token" -ForegroundColor Cyan 
-                "  Token expired! Acquiring a new token." | Out-File $oFile -Append     
+                "  Token expired! Acquiring a new token." | Out-File $oLogFile -Append     
             
                 $accessToken = $null;
             
@@ -247,7 +258,7 @@ ForEach ($teamRow in $teamsRows){
                 }
                 catch{
                     Write-Host "  Could not acquire a new token. Forced exit!" -ForegroundColor Red 
-                    "  Could not acquire a new token. Forced exit!" | Out-File $oFile -Append     
+                    "  Could not acquire a new token. Forced exit!" | Out-File $oLogFile -Append     
                     Break TeamsLoop
                 }
 
@@ -256,19 +267,24 @@ ForEach ($teamRow in $teamsRows){
                 $sTimeToExpiry = $TimeToExpiry.Minutes.ToString() + " min " + $TimeToExpiry.Seconds.ToString() + " sec"
                 
                 Write-Host "  New Token - TimeToExpiry: " $sTimeToExpiry
-                "  New Token - TimeToExpiry: '$sTimeToExpiry'" | Out-File $oFile -Append            
+                "  New Token - TimeToExpiry: '$sTimeToExpiry'" | Out-File $oLogFile -Append            
 
             }
      
             if(-not($testOnly)){
                 #CHANGE - Provisioning of the new Team by using GraphAPI
                 try{
-                    CreateEduTeam -TeamName $tnn -TeamDescription $tdn -accessToken $accessToken.RawData
+                    CreateEduTeam -TeamName $tnn -TeamDescription $tdn -TeamTemplate $templateName -accessToken $accessToken.RawData
+                    $tnn+";"+"CreateEduTeam;Success;"+$tdn | Out-File $oCsvFile -Append
                 }
                 catch{
+                    $tnn+";"+"CreateEduTeam;Error;" + $_.Exception.Message | Out-File $oCsvFile -Append
+                    if(-not($TeamsToBeRepeated.ContainsKey($tnn))){
+                        $TeamsToBeRepeated.Add($tnn,$tdn)
+                    }
                     $errCount++;
                     Write-Host "ERROR while creating the team '" $tnn "': " $_.Exception.Message "'" -ForegroundColor Red 
-                    "  ERROR while creating the team: '$tnn'" | Out-File $oFile -Append
+                    "  ERROR while creating the team: '$tnn'" | Out-File $oLogFile -Append
 
                     throw
                 }
@@ -276,100 +292,94 @@ ForEach ($teamRow in $teamsRows){
                 #Accessing the new team 
                 $group = Get-Team -MailNickname $tnn
                 if($group){
+                    $tnn+";"+"Get-Team;Success;New team" | Out-File $oCsvFile -Append
                     $gnn = $group.MailNickName
                     Write-Host "  New team created and successfully accessed: " $gnn
-                    "  New team created and successfully accessed: '$gnn'" | Out-File $oFile -Append
+                    "  New team created and successfully accessed: '$gnn'" | Out-File $oLogFile -Append
                 }
                 else{
+                    $tnn+";"+"Get-Team;Error;New team" | Out-File $oCsvFile -Append
+                    if(-not($TeamsToBeRepeated.ContainsKey($tnn))){
+                        $TeamsToBeRepeated.Add($tnn,$tdn)
+                    }
                     $errCount++;
                     Write-Host "ERROR while searching the new team: " $tnn -ForegroundColor Red 
-                    "  ERROR while searching the new team: '$tnn'" | Out-File $oFile -Append
+                    "  ERROR while searching the new team: '$tnn'" | Out-File $oLogFile -Append
                 
                     throw
                 }
             }
             else{
+                $tnn+";"+"CreateEduTeam;Success;Simulated" | Out-File $oCsvFile -Append
                 Write-Host "  Simulated - Created the new team: " $tnn
-                "  Simulated - Created the new team: $tnn" | Out-File $oFile -Append
+                "  Simulated - Created the new team: $tnn" | Out-File $oLogFile -Append
             }
         }
         else{
+            $tnn+";"+"Get-Team;Success;Already existing" | Out-File $oCsvFile -Append
             Write-Host "  The team already exists: " $group.MailNickName
-            "  The team already exists: $tnn" | Out-File $oFile -Append
+            "  The team already exists: $tnn" | Out-File $oLogFile -Append
         }
     
     }
     catch{
+        $tnn+";"+"Get-Team;Error;" + $_.Exception.Message | Out-File $oCsvFile -Append
+        if(-not($TeamsToBeRepeated.ContainsKey($tnn))){
+            $TeamsToBeRepeated.Add($tnn,$tdn)
+        }
         Write-Host "Skipping the team '" $tnn "' " -ForegroundColor Red 
-        "  Skipping the team: '$tnn'" | Out-File $oFile -Append
+        "  Skipping the team: '$tnn'" | Out-File $oLogFile -Append
 
         continue TeamsLoop #STOP executing the following actions for this team!
     }
 
-    #Reading the Team owners
-    $ownersRows = Import-Csv -Path $csvOwners  -Delimiter $delimiter | 
+    #Reading the Team Users
+    $usersRows = Import-Csv -Path $csvUsers  -Delimiter $delimiter | 
     Where-Object -Property "Team NN" -eq $tnn 
 
-    :OwnersLoop
-    Foreach($ownerRow in $ownersRows){            
-        $oUPN = $ownerRow."Owner"
+    :UsersLoop
+    Foreach($userRow in $usersRows){           
+        $uUPN = $userRow."User".Trim()
+        $uR = $userRow."Role".Trim()
                 
         try{
-            $oObj = Get-AzureADUser -Filter "UserPrincipalName eq '$oUPN'"
+            $R = ""
+            if($uR.ToLower() -eq "member") { $R = "Member" }
+            if($uR.ToLower() -eq "owner") { $R = "Owner" }
+            if($R -eq "") {Throw "Invalid role specified for the user "+$uUPN+" in the input file '"+$csvUsers+"'"}
 
-            if($oObj){
-                Write-Host "  Setting the user as team owner: " $oUPN -ForegroundColor Green
-                "  Setting the user as team owner: $oUPN" | Out-File $oFile -Append
-                        
-                if(-not($testOnly)){
-                    #CHANGE - Setting the user as team owner
-                    Add-TeamUser -GroupId $group.GroupId -User $oUPN -Role Owner 
-                }
-                $done=$true;
-            }
-            else{
-                Write-Host "  User to be set as owner not found in Azure AD: " $oUPN -ForegroundColor Yellow
-                "  User to be set as owner not found in Azure AD: $oUPN" | Out-File $oFile -Append                        
-            }
-	    }
-        catch{
-            $errCount++;
-            Write-Host "  ERROR (" $errCount ") - Cannot set the user as owner of the Team $oUPN" -ForegroundColor Red
-            "  ERROR ($errCount) - Cannot set the user as owner of the Team: $oUPN" | Out-File $oFile -Append               
-        }
+            $uObj = Get-AzureADUser -Filter "UserPrincipalName eq '$uUPN'"
 
-    }
+            if($uObj){
+                $uUPN+";"+"Get-AzureADUser;Success;UsersLoop" | Out-File $oCsvFile -Append
 
-    #Reading the Team Members
-    $membersRows = Import-Csv -Path $csvUsers  -Delimiter $delimiter | 
-    Where-Object -Property "Team NN" -eq $tnn # $($_."Team NN")
-
-    :MembersLoop
-    Foreach($memberRow in $membersRows){           
-        $mUPN = $memberRow."User"
-                
-        try{
-            $mObj = Get-AzureADUser -Filter "UserPrincipalName eq '$mUPN'"
-
-            if($mObj){
-                Write-Host "  Setting the user as team member: " $mUPN -ForegroundColor Green
-                "  Setting the user as team member: $mUPN" | Out-File $oFile -Append
+                Write-Host "  Setting the user as team " $R ": " $uUPN -ForegroundColor Green
+                "  Setting the user as team $R : $uUPN" | Out-File $oLogFile -Append
 
                 if(-not($testOnly)){
                     #CHANGE - Setting the user as team member
-                    Add-TeamUser -GroupId $group.GroupId -User $mUPN -Role Member
+                    Add-TeamUser -GroupId $group.GroupId -User $uUPN -Role $R
+                    $uUPN+";"+"Add-TeamUser;Success;"+$R | Out-File $oCsvFile -Append
                 }
                 $done=$true;
             }
             else{
-                Write-Host "  User to be set as member not found in Azure AD: " $mUPN -ForegroundColor Yellow
-                "  User to be set as member not found in Azure AD: $mUPN" | Out-File $oFile -Append                        
+                if(-not($TeamsToBeRepeated.ContainsKey($tnn))){
+                    $TeamsToBeRepeated.Add($tnn,$tdn)
+                }
+                $uUPN+";"+"Get-AzureADUser;Error;UsersLoop - User not found" | Out-File $oCsvFile -Append
+                Write-Host "  User to be set as " $R " not found in Azure AD: " $uUPN -ForegroundColor Yellow
+                "  User to be set as $R not found in Azure AD: $uUPN" | Out-File $oLogFile -Append                        
             }
 	    }
         catch{
+            if(-not($TeamsToBeRepeated.ContainsKey($tnn))){
+                $TeamsToBeRepeated.Add($tnn,$tdn)
+            }
+            $tnn+";"+"UsersLoop;Error;" + $_.Exception.Message | Out-File $oCsvFile -Append
             $errCount++;
-            Write-Host "  ERRORE (" $errCount ") - Cannot set the user as member of the Team $mUPN" -ForegroundColor Red
-            "  ERRORE ($errCount) - Cannot set the user as member of the Team: $mUPN" | Out-File $oFile -Append
+            Write-Host "  ERRORE (" $errCount ") - Cannot set the user as $R of the Team $uUPN" -ForegroundColor Red
+            "  ERRORE ($errCount) - Cannot set the user as $R of the Team: $uUPN" | Out-File $oLogFile -Append
         }
 
     }
@@ -377,35 +387,49 @@ ForEach ($teamRow in $teamsRows){
     try{       
 	    $oldgdn = $group.DisplayName
         Write-Host "  Changing the Display Name of the Team from '" $oldgdn "' to '" $tdn "'"
-        "  Changing the Display Name of the Team from '$oldgdn' to '$tdn'"| Out-File $oFile -Append 
+        "  Changing the Display Name of the Team from '$oldgdn' to '$tdn'"| Out-File $oLogFile -Append 
         
         if(-not($testOnly)){
             #CHANGE - Changing the Display Name of the Team 
             Set-Team -GroupId $group.GroupId -DisplayName $tdn -Description "Lezioni di $tdn" | Out-Null
+            $oldgdn+";"+"Set-Team;Success;Change DisplayName" | Out-File $oCsvFile -Append
         }
     }
     catch{
+        $uObj.UserPrincipalName+";"+"Set-Team;Error;" + $_.Exception.Message | Out-File $oCsvFile -Append
+        if(-not($TeamsToBeRepeated.ContainsKey($tnn))){
+            $TeamsToBeRepeated.Add($tnn,$tdn)
+        }
         $errCount++;
         Write-Host "ERROR (" $errCount ") - Error while changing the Display Name of the Team from '" $oldgdn "' to '" $tdn "'" " - " $_.Exception.Message -ForegroundColor DarkRed -BackgroundColor Yellow
-        "  ERROR ($errCount) - Error while changing the Display Name of the Team $tnn - $_.Exception.Message"| Out-File $oFile -Append 
+        "  ERROR ($errCount) - Error while changing the Display Name of the Team $tnn - $_.Exception.Message"| Out-File $oLogFile -Append 
     }
     
 }
 
 if($errCount -gt 0){
-	Write-Host "ATTENTION: registered " $errCount " errors. Details in the log file '" $oFile "'" -ForegroundColor DarkRed -BackgroundColor Yellow
-	"ATTENTION: registered $errCount errors." | Out-File $oFile -Append
+	Write-Host "ATTENTION: registered " $errCount " errors. Details in the log file '" $oLogFile "'" -ForegroundColor DarkRed -BackgroundColor Yellow
+	"ATTENTION: registered $errCount errors." | Out-File $oLogFile -Append
 }
 else{
-	Write-Host "INFORMATION: execution ended successfully. Details in the log file '" $oFile "'" -ForegroundColor DarkGreen -BackgroundColor Cyan
-	"INFORMATION: execution ended successfully." | Out-File $oFile -Append
+	Write-Host "INFORMATION: execution ended successfully. Details in the log file '" $oLogFile "'" -ForegroundColor DarkGreen -BackgroundColor Cyan
+	"INFORMATION: execution ended successfully." | Out-File $oLogFile -Append
+}
+
+if( ($TeamsToBeRepeated) -and ($TeamsToBeRepeated.Count -gt 0) ){
+    $oRepFile = "$outLogDir\Team-Repeat.csv"
+    '"Team NN"+$delimiter+"Team DN"' | Out-File $oRepFile
+
+    $TeamsToBeRepeated.Keys | ForEach-Object{
+        '"'+ $_ + '"'+$delimiter+'"' + $TeamsToBeRepeated.Item($_) +'"' | Out-File $oRepFile -Append
+    }
 }
 
 $LogEndTime = Get-Date -Format "yyyy-MM-dd_hh.mm.ss"
 if($testOnly){
-        "SIMULATED EXECUTION ENDED - $LogEndTime"| Out-File $oFile -Append 
+        "SIMULATED EXECUTION ENDED - $LogEndTime"| Out-File $oLogFile -Append 
 }
 else{
-	"EXECUTION ENDED - $LogEndTime" | Out-File $oFile -Append
+	"EXECUTION ENDED - $LogEndTime" | Out-File $oLogFile -Append
 }
 
