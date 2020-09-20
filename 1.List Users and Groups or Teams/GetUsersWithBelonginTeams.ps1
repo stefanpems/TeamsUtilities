@@ -1,12 +1,12 @@
 ﻿<#
   .VERSION AND AUTHOR
-    Script version: v-2020.04.11
+    Script version: v-2020.09.20
     Author: Stefano Pescosolido, https://www.linkedin.com/in/stefanopescosolido/
     Script published in GitHub: https://github.com/stefanpems/TeamsUtilities
 
   .SYNOPSIS
   This script generates a CSV files with the list of all the users existing in Azure AD/Office 365.
-  If requested, the script can list all the teams to which the users belongs.
+  If requested, the script can create also a second file with the list of all the teams to which the users belongs. 
 
   .VARIABLES TO BE SET
     See below
@@ -25,54 +25,187 @@
         
     Details here: https://docs.microsoft.com/en-us/powershell/azure/active-directory/install-adv2?view=azureadps-2.0
     and here: https://docs.microsoft.com/en-us/MicrosoftTeams/teams-powershell-install
+
 #>
 
 #########################################################################################################################
 # VARIABLES TO BE SET:
 #########################################################################################################################
 
-$outCsvDirPath = "C:\Temp" #Set the correct path
-$adminName = "nomeutente@nomescuola.edu.it" #Set the correct name
-$reportAlsoTeams = $false #Set the desider value ($true or $false) 
-                          #ATTENTION: when this is set to $true, the execution time is much longer.
-                          #           In this case, the script produces 2 CSV files as output
+$outCsvDirPath = "C:\Temp\OUT" #"C:\Temp" #Set the correct path
+$adminName = "adminName@schoolName.edu" #Set the correct name
+$reportAlsoTeams = $true #Set the desider value ($true or $false) 
+                         #ATTENTION: when this is set to $true, the execution time is much longer.
+                         #           In this case, the script produces 2 CSV files as output
+$skipMembershipForTheseUsers = @() #Specify the users, if any, for whom you don't want to read the membership. 
+                         #Leave @() if the membership must be read for all the users.
+                         #Example:
+                         #$skipMembershipForTheseUsers = @(
+                         #    "name1@schoolName.edu",
+                         #    "name1@schoolName.edu"
+                         #    ) 
 
 #########################################################################################################################
-$LogStartTime = Get-Date -Format "yyyy-MM-dd_hh.mm.ss"
+cls
+$StartTimeAsDate = Get-Date
+$StartTimeAsString = $StartTimeAsDate.ToString("yyyy-MM-dd_hh.mm.ss")
 
-$outUsersCsvFilePath = "$outCsvDirPath\DumpUsers_Results_$LogStartTime.csv"
+$outUsersCsvFilePath = "$outCsvDirPath\DumpUsers_Results_$StartTimeAsString.csv"
 If (Test-Path $outUsersCsvFilePath){
 	Remove-Item $outUsersCsvFilePath
 }
-"UPN;DisplayName;GivenName;Surname;JobTitle;Department;PhysicalDeliveryOfficeName" | Out-File $outUsersCsvFilePath
+"UPN;DisplayName;GivenName;Surname;AccountEnabled;JobTitle;Department;PhysicalDeliveryOfficeName;UserObjectID" | Out-File $outUsersCsvFilePath
 Connect-AzureAD -AccountId $adminName
 
 if($reportAlsoTeams){
-    $outUsersTeamsCsvFilePath = "$outCsvDirPath\DumpUsersAndTeams_Results_$LogStartTime.csv"
+    $outUsersTeamsCsvFilePath = "$outCsvDirPath\DumpUsersAndTeams_Results_$StartTimeAsString.csv"
     If (Test-Path $outUsersTeamsCsvFilePath){
 	    Remove-Item $outUsersTeamsCsvFilePath
     }
-    "UPN;DisplayName;GivenName;Surname;JobTitle;Department;PhysicalDeliveryOfficeName;TeamNickName;TeamDisplayName;TeamVisibility;UserRoleInTeam" | Out-File $outUsersTeamsCsvFilePath
     Connect-MicrosoftTeams -AccountId $adminName
+    "UPN;DisplayName;GivenName;Surname;AccountEnabled;JobTitle;Department;PhysicalDeliveryOfficeName;UserObjectID;IsGroupOwner;GroupNickName;GroupDisplayName;ObjectType;IsTeam;TeamVisibility;IsArchivedTeam;GroupObjectID" | Out-File $outUsersTeamsCsvFilePath -Append
 }
- 
+
+$groupsList = @{} #HashTable used for caching values 
+$teamsList = @{} #HashTable used for caching values
+
 $countU = 0;
-Get-AzureADUser -All $true | ForEach-Object{
+$allUsers = Get-AzureADUser -All $true
+$numUsers = $allUsers.Count
+
+$allUsers | ForEach-Object{
+
+    $percentComplete = [math]::Round(100*$countU/$numUsers,1)
+    Write-Progress -Activity "Scanning users" -Status "$percentComplete % users analyzed" -PercentComplete $percentComplete
+
     $u = $($_)
     $countU++;
     Write-Host "($countU): User '" $u.UserPrincipalName "'" -ForegroundColor Green
-    $u.UserPrincipalName+";"+$u.DisplayName+";"+$u.GivenName+";"+$u.Surname+";"+$u.JobTitle+";"+$u.Department+";"+$u.PhysicalDeliveryOfficeName | Out-File $outUsersCsvFilePath -Append
 
-    if($reportAlsoTeams){
+    #Write into the Users CSV
+    $u.UserPrincipalName+";"+$u.DisplayName+";"+$u.GivenName+";"+$u.Surname+";"+$u.AccountEnabled+";"+$u.JobTitle+";"+$u.Department+";"+$u.PhysicalDeliveryOfficeName+";"+$u.ObjectId | Out-File $outUsersCsvFilePath -Append       
+    
+    if( ($reportAlsoTeams) -and (-not($skipMembershipForTheseUsers.Contains($u.UserPrincipalName))) )
+    {
+        $countG = 0
         $countT = 0
-        Get-Team -User $u.UserPrincipalName | ForEach-Object {
-            $t = $($_)
-            $countT++;
-            $gnn = $t.MailNickName
-            $gdn = $t.DisplayName
-            Write-Host "     ($countU - $countT): Team '$gnn' - '$gdn'" -ForegroundColor Cyan
-            $uit = Get-TeamUser -GroupId $t.GroupId | where User -eq $u.UserPrincipalName
-            $u.UserPrincipalName+";"+$u.DisplayName+";"+$u.GivenName+";"+$u.Surname+";"+$u.JobTitle+";"+$u.Department+";"+$u.PhysicalDeliveryOfficeName+";"+$gnn+";"+$gdn+";"+$t.Visibility+";"+$uit.Role | Out-File $outUsersTeamsCsvFilePath -Append       
+
+        $AllGroups = Get-AzureADUserMembership -ObjectId $u.ObjectId -All $true
+        if($AllGroups){
+            $AllGroups | ForEach-Object {
+                $g = $($_)
+                $countG++;
+            
+                $groupInfo = @{}
+
+                $gnn = $g.MailNickName
+                $gdn = $g.DisplayName
+                $IsOwner = $false
+                $isTeam = $false
+                $teamVisibility = ""
+                $isArchivedTeam = $false
+
+
+                #Check if it is a Team or a different type of group (security, distribution, office 365)
+
+                if(-not([String]::IsNullOrEmpty($g.ObjectId)) -and ($g.ObjectType -eq "Group") ){
+                        
+                    if($groupsList.ContainsKey($g.ObjectId)){
+                        Write-Host "     ($countU - $countG): Reading group '" $gnn "' ('" $gdn "') from cache" -ForegroundColor gray
+                        $groupInfo = $groupsList.Item($g.ObjectId)
+                
+                        $isTeam = $groupInfo.IsTeam
+                        $isArchivedTeam = $groupInfo.IsArchivedTeam
+                        $teamVisibility = $groupInfo.TeamVisibility
+                        $gm = $groupInfo.Users
+
+                        if(-not([String]::IsNullOrEmpty($u.UserPrincipalName)) -and $gm.ContainsKey($u.UserPrincipalName)) {
+                            $IsOwner = $gm.Item($u.UserPrincipalName)
+                        }
+                    }
+                    else{
+                        Write-Host "     ($countU - $countG): Reading and caching info for group '" $gnn "' ('" $gdn "') from Azure" -ForegroundColor cyan
+
+                        try{
+                            $t = Get-Team -GroupId $g.ObjectId 
+                            $isTeam = $true
+                            $isArchivedTeam = $t.Archived
+                            $teamVisibility = $t.Visibility
+                        }
+                        catch{
+                            $isTeam = $false
+                            $isArchivedTeam = $false
+                            $teamVisibility = ""
+                        }
+
+                        $users = @{}
+                        $IsOwner = $false
+
+                        $ow = $null
+                        try{
+                            $ow = Get-AzureADGroupOwner -ObjectId $g.ObjectId 
+                        }
+                        catch{
+                            Write-Host "     ($countU - $countG): ERROR while executing Get-AzureADGroupOwner for group '" $gnn "' ('" $gdn "') from Azure: " $_.Exception.Message -ForegroundColor Red
+                        }
+
+                        if($ow){        
+                            if($ow.Count -gt 0){
+                                if($ow.Count -eq 1){
+                                    $users.Add($ow.UserPrincipalName,$true)
+                                    if($ow.UserPrincipalName.toLower() -eq $u.UserPrincipalName.ToLower()){
+                                        $IsOwner = $true
+                                    }
+                                }
+                                else{
+                                    $ow | ForEach-Object{
+                                        $users.Add($_.UserPrincipalName,$true)
+
+                                        if(-not($IsOwner) -and (($ow.UserPrincipalName.toLower() -eq $u.UserPrincipalName.ToLower()))){
+                                            $IsOwner = $true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+    
+                        try{
+                            Get-AzureADGroupMember -ObjectId $g.ObjectId | ForEach-Object{
+                                if(-not($users.ContainsKey($_.UserPrincipalName))){
+                                    $users.Add($_.UserPrincipalName,$false)
+                                }
+                            }
+                        }
+                        catch{
+                            Write-Host "     ($countU - $countG): ERROR while executing Get-AzureADGroupMember for group '$gnn' ('$gdn') from Azure: " $_.Exception.Message -ForegroundColor Red
+                        }
+
+                        $groupInfo = @{
+                            IsTeam = $isTeam
+                            IsArchivedTeam = $isArchivedTeam
+                            TeamVisibility = $teamVisibility
+                            Users = $users
+                        }
+
+                        $groupsList.Add($g.ObjectId, $groupInfo)
+
+                    }
+                }
+
+                #Write into the Users and Groups CSV
+                $u.UserPrincipalName+";"+$u.DisplayName+";"+$u.GivenName+";"+$u.Surname+";"+$u.AccountEnabled+";"+$u.JobTitle+";"+$u.Department+";"+$u.PhysicalDeliveryOfficeName+";"+$u.ObjectId+";"+$IsOwner+";"+$gnn+";"+$gdn+";"+$g.ObjectType+";"+$isTeam+";"+$teamVisibility+";"+$isArchivedTeam+";"+$g.ObjectId| Out-File $outUsersTeamsCsvFilePath -Append       
+            }
+        }
+        else{
+            $u.UserPrincipalName+";"+$u.DisplayName+";"+$u.GivenName+";"+$u.Surname+";"+$u.AccountEnabled+";"+$u.JobTitle+";"+$u.Department+";"+$u.PhysicalDeliveryOfficeName+";"+$u.ObjectId+";"+$false+";;;;"+$false+";;"+$false+";"| Out-File $outUsersTeamsCsvFilePath -Append       
         }
     }
 }
+$EndTime = Get-Date -Format "yyyy-MM-dd_hh.mm.ss"
+
+$EndTimeAsDate = Get-Date
+$EndTimeAsString = $EndTimeAsDate.ToString("yyyy-MM-dd_hh.mm.ss")
+
+$ExecDuration = New-TimeSpan -Start $StartTimeAsDate -End $EndTimeAsDate
+
+Write-Host "Execution ended - Duration: " $ExecDuration.Hours " hours and " $ExecDuration.Minutes " minutes." -ForegroundColor DarkBlue -BackgroundColor Cyan
