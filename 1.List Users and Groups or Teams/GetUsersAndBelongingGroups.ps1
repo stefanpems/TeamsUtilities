@@ -1,5 +1,5 @@
 ﻿<#
-  .VERSION AND AUTHOR
+  .VERSION AND AUTHOR 
     Script version: v-2020.09.20
     Author: Stefano Pescosolido, https://www.linkedin.com/in/stefanopescosolido/
     Script published in GitHub: https://github.com/stefanpems/TeamsUtilities
