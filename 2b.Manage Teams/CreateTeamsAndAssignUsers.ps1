@@ -42,6 +42,7 @@ $csvTeams = "C:\Temp\IN\Team.csv"           #EXPECTED COLUMNS: "Team NN","Team D
                                             #NOTE: In the Team NN do not use special characters. 
                                             #      For schools, we recommend to add the school year as prefix.
                                             #      Example of row: "as2021-1A-italian;1A Italian Language and Culture"
+                                            #NOTE: Leave "Team DN" as empty if you don't want to change the DisplayName of the team.
 $csvUsers = "C:\Temp\IN\Team-User.csv"      #EXPECTED COLUMNS: "Team NN","User","Role" -> Team NickName, LoginName of the User to be added, Role for the user to be added
                                             #NOTE: the expected values in the column "Role" are "Member" or "Owner".
                                             #      Example of row: "as2021-1A-italian;xxx@schoolName.edu;Member"
@@ -397,13 +398,16 @@ ForEach ($teamRow in $teamsRows){
 
     try{       
 	    $oldgdn = $group.DisplayName
-        Write-Host "  Changing the Display Name of the Team from '" $oldgdn "' to '" $tdn "'"
-        "  Changing the Display Name of the Team from '$oldgdn' to '$tdn'"| Out-File $oLogFile -Append 
+
+        if((-not([String]::IsNullOrEmpty($tdn))) -and ($oldgdn -ne $tdn)){
+            Write-Host "  Changing the Display Name of the Team from '" $oldgdn "' to '" $tdn "'"
+            "  Changing the Display Name of the Team from '$oldgdn' to '$tdn'"| Out-File $oLogFile -Append 
         
-        if(-not($testOnly)){
-            #CHANGE - Changing the Display Name of the Team 
-            Set-Team -GroupId $group.GroupId -DisplayName $tdn -Description "Lezioni di $tdn" | Out-Null
-            $oldgdn+";"+"Set-Team;Success;Change DisplayName" | Out-File $oCsvFile -Append
+            if(-not($testOnly)){
+                #CHANGE - Changing the Display Name of the Team 
+                Set-Team -GroupId $group.GroupId -DisplayName $tdn -Description "Lezioni di $tdn" | Out-Null
+                $oldgdn+";"+"Set-Team;Success;Change DisplayName" | Out-File $oCsvFile -Append
+            }
         }
     }
     catch{
