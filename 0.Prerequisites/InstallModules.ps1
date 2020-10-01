@@ -40,5 +40,5 @@ Install-Module AzureADPreview -Force #or install AzureAD (not the preview versio
 Install-Module SharePointPnPPowerShellOnline -Force
 #INFO: https://docs.microsoft.com/en-us/sharepoint/dev/declarative-customization/site-design-pnppowershell
 
-Install-Module -Name ExchangeOnlineManagement
+Install-Module -Name ExchangeOnlineManagement -Force
 #INFO and prereqs: https://docs.microsoft.com/en-us/powershell/exchange/exchange-online-powershell-v2?view=exchange-ps#install-and-maintain-the-exo-v2-module

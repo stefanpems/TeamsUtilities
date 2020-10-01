@@ -1,6 +1,6 @@
 ﻿<#
   .VERSION AND AUTHOR
-    Script version: v-2020.09.20
+    Script version: v-2020.10.01
     Author: Stefano Pescosolido, https://www.linkedin.com/in/stefanopescosolido/
     Script published in GitHub: https://github.com/stefanpems/TeamsUtilities
 
@@ -238,11 +238,24 @@ ForEach ($teamRow in $teamsRows){
     #Searching for the Team 
     $tnn = $teamRow."Team NN".Trim()
     $tdn = $teamRow."Team DN".Trim()
-        
-    Write-Host "Searching for the team: " $tnn "-" $tdn
-    "Searching for the team: $tnn - $tdn" | Out-File $oLogFile -Append
 
     try{
+
+        if([String]::IsNullOrEmpty($tnn)){
+            Throw "Missing Team NN"
+        }
+
+        if([String]::IsNullOrEmpty($tdn)){
+            Throw "Missing Team DN"
+        }
+
+        if($tnn.IndexOf(" ") -ge 0){
+            Throw "Invalid Team NN: it cannot contain spaces! Please correct the name in the input files"
+        } 
+        
+        Write-Host "Searching for the team: " $tnn "-" $tdn
+        "Searching for the team: $tnn - $tdn" | Out-File $oLogFile -Append
+
 
         $group = Get-Team -MailNickname $tnn
 
@@ -433,7 +446,7 @@ else{
 
 if( ($TeamsToBeRepeated) -and ($TeamsToBeRepeated.Count -gt 0) ){
     $oRepFile = "$outLogDir\Team-Repeat.csv"
-    '"Team NN"+$delimiter+"Team DN"' | Out-File $oRepFile
+    "Team NN"+$delimiter+"Team DN" | Out-File $oRepFile
 
     $TeamsToBeRepeated.Keys | ForEach-Object{
         '"'+ $_ + '"'+$delimiter+'"' + $TeamsToBeRepeated.Item($_) +'"' | Out-File $oRepFile -Append
