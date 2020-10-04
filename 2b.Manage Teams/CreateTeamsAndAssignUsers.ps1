@@ -1,6 +1,6 @@
 ﻿<#
   .VERSION AND AUTHOR
-    Script version: v-2020.10.01
+    Script version: v-2020.10.04
     Author: Stefano Pescosolido, https://www.linkedin.com/in/stefanopescosolido/
     Script published in GitHub: https://github.com/stefanpems/TeamsUtilities
 
@@ -54,6 +54,13 @@ $templateName = "educationClass"
     # -> Set "educationClass" for creating teams with the template "Class"
     # -> Set "educationStaff" for creating teams with the template "Staff" ("Personale" in Italian)
     #Details in https://support.microsoft.com/en-us/office/choose-a-team-type-to-collaborate-in-microsoft-teams-0a971053-d640-4555-9fd7-f785c2b99e67
+
+$teamsDescriptionPrefix = "Lezioni di " 
+$teamsDescriptionReplaceWhat = "" 
+$teamsDescriptionReplaceWithWhat = ""
+    #The description of each team is set equal to its display name specified in $csvTeams. 
+    #With the 3 above variable you can differentiate the description with a prefix and/or with a replace.
+    #NOTE: if $teamsDescriptionPrefix is set, pay attention to leave a final space or separator character.
 
 $adminName = "adminName@schoolName.edu" #Set the correct name! NOTE: must be pre-assigned a license including Teams!
     #RECOMMENDATION: do not use a "personal" account as $adminName. This name appears in the first screen of every 
@@ -215,7 +222,7 @@ if($testOnly){
 else{
 	"EXECUTION STARTED - $LogStartTime" | Out-File $oLogFile 
 }
-Write-Host "Creato il file di log '$oFile'" -ForegroundColor Yellow
+Write-Host "Creato il file di log '$oLogFile'" -ForegroundColor Yellow
 "Target;Action;Result;Details" | Out-File $oCsvFile 
 
 $errCount = 0;
@@ -409,18 +416,49 @@ ForEach ($teamRow in $teamsRows){
 
     }
 
+    #Changing the description
     try{       
 	    $oldgdn = $group.DisplayName
+        if([String]::IsNullOrEmpty($tdn)){ $tdn = $oldgdn }
+        
+        $oldgdesc = $group.Description
+        $tdesc = ($teamsDescriptionPrefix+$tdn).Replace($teamsDescriptionReplaceWhat,$teamsDescriptionReplaceWithWhat)                
+        if([String]::IsNullOrEmpty($tdesc)){ $tdesc = $oldgdn }
+        
+        $notYetChanged = $true
+        if( $notYetChanged -and ( ($oldgdn -ne $tdn) -and ($oldgdesc -ne $tdesc) ) ){
+            $notYetChanged = $false   
+            if(-not($testOnly)){
+                Write-Host "  Changing the Display Name of the Team from '" $oldgdn "' to '" $tdn "'"
+                "  Changing the Display Name of the Team from '$oldgdn' to '$tdn'"| Out-File $oLogFile -Append 
+                Write-Host "  Changing the Description of the Team from '" $oldgdesc "' to '" $tdesc "'"
+                "  Changing the Description of the Team from '$oldgdesc' to '$tdesc'"| Out-File $oLogFile -Append    
+                #CHANGE - Changing the Display Name of the Team 
+                Set-Team -GroupId $group.GroupId -DisplayName $tdn -Description $tdesc | Out-Null
+                $oldgdn+";"+"Set-Team;Success;Change DisplayName and Description" | Out-File $oCsvFile -Append
+            }
+        }
 
-        if((-not([String]::IsNullOrEmpty($tdn))) -and ($oldgdn -ne $tdn)){
+        if( $notYetChanged -and ($oldgdn -ne $tdn) ){
+            $notYetChanged = $false 
             Write-Host "  Changing the Display Name of the Team from '" $oldgdn "' to '" $tdn "'"
             "  Changing the Display Name of the Team from '$oldgdn' to '$tdn'"| Out-File $oLogFile -Append 
-        
             if(-not($testOnly)){
                 #CHANGE - Changing the Display Name of the Team 
-                Set-Team -GroupId $group.GroupId -DisplayName $tdn -Description "Lezioni di $tdn" | Out-Null
+                Set-Team -GroupId $group.GroupId -DisplayName $tdn | Out-Null
                 $oldgdn+";"+"Set-Team;Success;Change DisplayName" | Out-File $oCsvFile -Append
-            }
+            }   
+        }
+
+        if( $notYetChanged -and ($oldgdesc -ne $tdesc) ){
+            $notYetChanged = $false 
+            Write-Host "  Changing the Description of the Team from '" $oldgdesc "' to '" $tdesc "'"
+            "  Changing the Description of the Team from '$oldgdesc' to '$tdesc'"| Out-File $oLogFile -Append    
+            if(-not($testOnly)){
+                #CHANGE - Changing the Display Name of the Team 
+                Set-Team -GroupId $group.GroupId -Description $tdesc | Out-Null
+                $oldgdn+";"+"Set-Team;Success;Change Description" | Out-File $oCsvFile -Append
+            }  
         }
     }
     catch{
@@ -429,8 +467,8 @@ ForEach ($teamRow in $teamsRows){
             $TeamsToBeRepeated.Add($tnn,$tdn)
         }
         $errCount++;
-        Write-Host "ERROR (" $errCount ") - Error while changing the Display Name of the Team from '" $oldgdn "' to '" $tdn "'" " - " $_.Exception.Message -ForegroundColor DarkRed -BackgroundColor Yellow
-        "  ERROR ($errCount) - Error while changing the Display Name of the Team $tnn - $_.Exception.Message"| Out-File $oLogFile -Append 
+        Write-Host "ERROR (" $errCount ") - Error while changing the Display Name and/or the Description of the Team from '" $oldgdn "' to '" $tdn "'" " - " $_.Exception.Message -ForegroundColor DarkRed -BackgroundColor Yellow
+        "  ERROR ($errCount) - Error while changing the Display Name and/or the Description of the Team $tnn - $_.Exception.Message"| Out-File $oLogFile -Append 
     }
     
 }
