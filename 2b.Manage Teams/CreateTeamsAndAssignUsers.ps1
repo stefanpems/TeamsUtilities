@@ -446,7 +446,7 @@ else{
 
 if( ($TeamsToBeRepeated) -and ($TeamsToBeRepeated.Count -gt 0) ){
     $oRepFile = "$outLogDir\Team-Repeat.csv"
-    "Team NN"+$delimiter+"Team DN" | Out-File $oRepFile
+    '"Team NN"'+$delimiter+'"Team DN"' | Out-File $oRepFile
 
     $TeamsToBeRepeated.Keys | ForEach-Object{
         '"'+ $_ + '"'+$delimiter+'"' + $TeamsToBeRepeated.Item($_) +'"' | Out-File $oRepFile -Append
