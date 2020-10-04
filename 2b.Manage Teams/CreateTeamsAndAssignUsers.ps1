@@ -58,8 +58,8 @@ $templateName = "educationClass"
 $teamsDescriptionPrefix = "Lezioni di " 
 $teamsDescriptionReplaceWhat = "" 
 $teamsDescriptionReplaceWithWhat = ""
-    #The description of each team is set equal to its display name specified in $csvTeams. 
-    #With the 3 above variable you can differentiate the description with a prefix and/or with a replace.
+    #The description of each team by default is set equal to its display name specified in $csvTeams. 
+    #With the 3 above variables you can differentiate the description with a prefix and/or with a replace of a specific text with another.
     #NOTE: if $teamsDescriptionPrefix is set, pay attention to leave a final space or separator character.
 
 $adminName = "adminName@schoolName.edu" #Set the correct name! NOTE: must be pre-assigned a license including Teams!
