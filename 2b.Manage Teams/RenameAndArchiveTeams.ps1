@@ -108,7 +108,7 @@ function ProcessTeam{
 
             #Change the NickName
             if(-not($t.MailNickName.ToLower().StartsWith($newPrefixYearInTeamsNickNameAndEmail.ToLower()))){
-                if($t.MailNickName.StartsWith($replaceOldPrefixYearInTeamsNickNameAndEmail)){
+                if( -not([String]::IsNullOrEmpty($replaceOldPrefixYearInTeamsNickNameAndEmail)) -and  $t.MailNickName.StartsWith($replaceOldPrefixYearInTeamsNickNameAndEmail)   ){
                     $newMailNickName = $t.MailNickName.Replace($replaceOldPrefixYearInTeamsNickNameAndEmail,$newPrefixYearInTeamsNickNameAndEmail)
                 }
                 else{
@@ -142,7 +142,7 @@ function ProcessTeam{
             }
 
             if( ($ug) -and (-not($ug.PrimarySmtpAddress.ToLower().StartsWith($newPrefixYearInTeamsNickNameAndEmail.ToLower())))){
-                if($ug.PrimarySmtpAddress.StartsWith($replaceOldPrefixYearInTeamsNickNameAndEmail)){
+                if( -not([String]::IsNullOrEmpty($replaceOldPrefixYearInTeamsNickNameAndEmail)) -and  $ug.PrimarySmtpAddress.StartsWith($replaceOldPrefixYearInTeamsNickNameAndEmail)){
                     $newMailPrimarySmtpAddress = $ug.PrimarySmtpAddress.Replace($replaceOldPrefixYearInTeamsNickNameAndEmail,$newPrefixYearInTeamsNickNameAndEmail)
                 }
                 else{
@@ -258,12 +258,21 @@ if([String]::IsNullOrEmpty($csvTeamsToBeConsidered)){
         $t = $null
         try{
             $t = Get-Team -GroupId $g.ObjectId 
-            $line = "The group is a Team: " + $t.MailNickName + " - (" + $t.DisplayName + ")"; $line| Out-File $outLogFilePath -Append; Write-Host $line -ForegroundColor Green
-            ProcessTeam($t)      
+            $line = "The group is a Team: " + $t.MailNickName + " - (" + $t.DisplayName + ")"; $line| Out-File $outLogFilePath -Append; Write-Host $line -ForegroundColor Green              
         }
         catch{
-            $line = "The group is not a Team: " + $g.MailNickName + " - (" + $g.DisplayName + ")"; $line| Out-File $outLogFilePath -Append; Write-Host $line -ForegroundColor Cyan
+            $line = "The group is not a Team: " + $g.MailNickName + " - (" + $g.DisplayName + ")"; $line| Out-File $outLogFilePath -Append; Write-Host $line -ForegroundColor Red
         }    
+
+        if($t){
+            try{
+                ProcessTeam($t)    
+            }
+            catch{
+                $line = "Error while processing the Team: " + $g.MailNickName + " - (" + $g.DisplayName + ")"; $line| Out-File $outLogFilePath -Append; Write-Host $line -ForegroundColor Red
+            } 
+        }
+
     }
 }
 else{
@@ -285,12 +294,25 @@ else{
         try{
             $tnn = $r."$columnTeamNN"
             $t = Get-Team -MailNickName $tnn
-            $line = "Successfully accessed the Team: " + $t.MailNickName + " - (" + $t.DisplayName + ")"; $line| Out-File $outLogFilePath -Append; Write-Host $line -ForegroundColor Green
-            ProcessTeam($t)      
+            if($t){
+                $line = "Successfully accessed the Team: " + $t.MailNickName + " - (" + $t.DisplayName + ")"; $line| Out-File $outLogFilePath -Append; Write-Host $line -ForegroundColor Green
+            }
+            else{
+                throw
+            }
         }
         catch{
-            $line = "Could not find the Team from the row: '" + $r + "'"; $line| Out-File $outLogFilePath -Append; Write-Host $line -ForegroundColor Cyan
+            $line = "Could not find the Team from the row: '" + $r + "'"; $line| Out-File $outLogFilePath -Append; Write-Host $line -ForegroundColor Red
         }    
+
+        if($t){
+            try{
+                ProcessTeam($t)      
+            }
+            catch{            
+                $line = "Error while processing the Team " + $t.MailNickName + " - (" + $t.DisplayName + ")"; $line| Out-File $outLogFilePath -Append; Write-Host $line -ForegroundColor Red
+            }
+        }
     }
 }
 
