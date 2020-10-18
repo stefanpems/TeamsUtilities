@@ -422,7 +422,8 @@ ForEach ($teamRow in $teamsRows){
         if([String]::IsNullOrEmpty($tdn)){ $tdn = $oldgdn }
         
         $oldgdesc = $group.Description
-        $tdesc = ($teamsDescriptionPrefix+$tdn).Replace($teamsDescriptionReplaceWhat,$teamsDescriptionReplaceWithWhat)                
+        $tdesc = ($teamsDescriptionPrefix+$tdn)
+        if(-not([String]::IsNullOrEmpty($teamsDescriptionReplaceWhat))){$tdesc=$tdesc.Replace($teamsDescriptionReplaceWhat,$teamsDescriptionReplaceWithWhat)}                
         if([String]::IsNullOrEmpty($tdesc)){ $tdesc = $oldgdn }
         
         $notYetChanged = $true
