@@ -1,6 +1,6 @@
 ﻿<#
   .VERSION AND AUTHOR
-    Script version: v-2020.10.04
+    Script version: v-2020.10.18
     Author: Stefano Pescosolido, https://www.linkedin.com/in/stefanopescosolido/
     Script published in GitHub: https://github.com/stefanpems/TeamsUtilities
 
