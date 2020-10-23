@@ -1,6 +1,6 @@
 ﻿<#
   .VERSION AND AUTHOR 
-    Script version: v-2020.09.20
+    Script version: v-2020.10.23
     Author: Stefano Pescosolido, https://www.linkedin.com/in/stefanopescosolido/
     Script published in GitHub: https://github.com/stefanpems/TeamsUtilities
 
@@ -63,7 +63,7 @@ if($reportAlsoTeams){
 	    Remove-Item $outUsersTeamsCsvFilePath
     }
     Connect-MicrosoftTeams -AccountId $adminName
-    "UPN;DisplayName;GivenName;Surname;AccountEnabled;JobTitle;Department;PhysicalDeliveryOfficeName;UserObjectID;IsGroupOwner;GroupNickName;GroupDisplayName;ObjectType;IsTeam;TeamVisibility;IsArchivedTeam;GroupObjectID" | Out-File $outUsersTeamsCsvFilePath -Append
+    "UPN;DisplayName;GivenName;Surname;AccountEnabled;JobTitle;Department;PhysicalDeliveryOfficeName;UserObjectID;IsGroupOwner;GroupNickName;GroupDisplayName;ObjectType;IsTeam;TeamVisibility;IsArchivedTeam;GroupObjectID;GroupCreatedDateTime;GroupRenewedDateTime" | Out-File $outUsersTeamsCsvFilePath -Append
 }
 
 $groupsList = @{} #HashTable used for caching values 
@@ -104,7 +104,8 @@ $allUsers | ForEach-Object{
                 $isTeam = $false
                 $teamVisibility = ""
                 $isArchivedTeam = $false
-
+                $gc = $null
+                $gr = $null
 
                 #Check if it is a Team or a different type of group (security, distribution, office 365)
 
@@ -118,6 +119,8 @@ $allUsers | ForEach-Object{
                         $isArchivedTeam = $groupInfo.IsArchivedTeam
                         $teamVisibility = $groupInfo.TeamVisibility
                         $gm = $groupInfo.Users
+                        $gc = $groupInfo.Created
+                        $gr = $groupInfo.Renewed
 
                         if(-not([String]::IsNullOrEmpty($u.UserPrincipalName)) -and $gm.ContainsKey($u.UserPrincipalName)) {
                             $IsOwner = $gm.Item($u.UserPrincipalName)
@@ -125,6 +128,15 @@ $allUsers | ForEach-Object{
                     }
                     else{
                         Write-Host "     ($countU - $countG): Reading and caching info for group '" $gnn "' ('" $gdn "') from Azure" -ForegroundColor cyan
+
+                        try{
+                            $gi = Get-AzureADMSGroup -Id $g.ObjectId
+                            $gc = $gi.CreatedDateTime.ToString("dd/MM/yyyy")
+                            $gr = $gi.RenewedDateTime.ToString("dd/MM/yyyy")
+                        }
+                        catch{
+                            Write-Host "     ($countU - $countG): ERROR while executing Get-AzureADMSGroup for group '" $gnn "' ('" $gdn "') from Azure: " $_.Exception.Message -ForegroundColor Red
+                        }
 
                         try{
                             $t = Get-Team -GroupId $g.ObjectId 
@@ -185,6 +197,8 @@ $allUsers | ForEach-Object{
                             IsArchivedTeam = $isArchivedTeam
                             TeamVisibility = $teamVisibility
                             Users = $users
+                            Created = $gc
+                            Renewed = $gr
                         }
 
                         $groupsList.Add($g.ObjectId, $groupInfo)
@@ -193,7 +207,7 @@ $allUsers | ForEach-Object{
                 }
 
                 #Write into the Users and Groups CSV
-                $u.UserPrincipalName+";"+$u.DisplayName+";"+$u.GivenName+";"+$u.Surname+";"+$u.AccountEnabled+";"+$u.JobTitle+";"+$u.Department+";"+$u.PhysicalDeliveryOfficeName+";"+$u.ObjectId+";"+$IsOwner+";"+$gnn+";"+$gdn+";"+$g.ObjectType+";"+$isTeam+";"+$teamVisibility+";"+$isArchivedTeam+";"+$g.ObjectId| Out-File $outUsersTeamsCsvFilePath -Append       
+                $u.UserPrincipalName+";"+$u.DisplayName+";"+$u.GivenName+";"+$u.Surname+";"+$u.AccountEnabled+";"+$u.JobTitle+";"+$u.Department+";"+$u.PhysicalDeliveryOfficeName+";"+$u.ObjectId+";"+$IsOwner+";"+$gnn+";"+$gdn+";"+$g.ObjectType+";"+$isTeam+";"+$teamVisibility+";"+$isArchivedTeam+";"+$g.ObjectId+";"+$gc+";"+$gr| Out-File $outUsersTeamsCsvFilePath -Append       
             }
         }
         else{
