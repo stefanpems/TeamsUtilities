@@ -7,8 +7,15 @@
   .ATTENTION (UPDATE 2020.10.25)
   The scripts in this workspace that use GraphAPI do not work with the latest version (Oct. 2020 - v. 3.26.2010.0) of the module 
   PnP.PowerShell / SharePointPnPPowerShellOnline.
-  We are investigating. Please use any previous version of that module (do not install the latest version by using the command
-  "Install-Module SharePointPnPPowerShellOnline" referenced below).
+  We are investigating. While we find a solution, please do not install the latest version or upgrade your current version, so
+  DO NOT install it by simply launching the command referenced below: Install-Module SharePointPnPPowerShellOnline  
+  Instead, check if you have the latest version already installed; if so, remove it; then install the previous version.
+  => To check if you have the issue, use the command: Connect-PnPOnline -Scopes "Mail.Read","Files.Read","ActivityFeed.Read" 
+     If you have the issue, you get an error AADSTS70011. If you don't have the issue, you get a login prompt
+  => To check which version is installed use the command: Get-Module -Name sharepointpnppowershell* -ListAvailable
+  => To remove any existing version use the command: Uninstall-Module SharePointPnPPowerShellOnline -AllVersions -Force"
+  => To install the previous (last working) version, use the command: "Install-Module SharePointPnPPowerShellOnline -RequiredVersion 3.25.2009.1"
+   
   More info on https://github.com/pnp/PnP-PowerShell/issues/2983
 
   .SYNOPSIS
