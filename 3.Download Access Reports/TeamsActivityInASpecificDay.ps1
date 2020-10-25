@@ -5,10 +5,10 @@
     Script published in GitHub: https://github.com/stefanpems/TeamsUtilities
 
   .ATTENTION (UPDATE 2020.10.25)
-  The scripts in this workspace that use GraphAPI do not work with the latest version (Oct. 2020 - v. 3.26.2010.0) of the module 
+  The script doesn't work with the latest version (Oct. 2020 - v. 3.26.2010.0) of the module 
   PnP.PowerShell / SharePointPnPPowerShellOnline.
   We are investigating. Please use any previous version of that module (do not install the latest version by using the command
-  "Install-Module SharePointPnPPowerShellOnline" referenced below).
+  "Install-Module SharePointPnPPowerShellOnline" referenced below in the PREREQUISITES).
   More info on https://github.com/pnp/PnP-PowerShell/issues/2983
 
   .SYNOPSIS
