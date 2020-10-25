@@ -4,6 +4,13 @@
     Author: Stefano Pescosolido, https://www.linkedin.com/in/stefanopescosolido/
     Script published in GitHub: https://github.com/stefanpems/TeamsUtilities
 
+  .ATTENTION (UPDATE 2020.10.25)
+  The scripts in this workspace that use GraphAPI do not work with the latest version (Oct. 2020 - v. 3.26.2010.0) of the module 
+  PnP.PowerShell / SharePointPnPPowerShellOnline.
+  We are investigating. Please use any previous version of that module (do not install the latest version by using the command
+  "Install-Module SharePointPnPPowerShellOnline" referenced below).
+  More info on https://github.com/pnp/PnP-PowerShell/issues/2983
+
   .SYNOPSIS
   This script downloads the Teams Activity Report for a specific day
 
