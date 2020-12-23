@@ -4,19 +4,6 @@
     Author: Stefano Pescosolido, https://www.linkedin.com/in/stefanopescosolido/
     Script published in GitHub: https://github.com/stefanpems/TeamsUtilities
 
-  .ATTENTION (UPDATE 2020.12.22)
-  The script doesn't work with the October 2020 version of PnP.PowerShell / SharePointPnPPowerShellOnline. NOTE: I haven't checked with any newer version.
-  We are investigating. While we find a solution, please use the September 2020 version of the module.
-  So, DO NOT install it by simply launching the command referenced below: Install-Module SharePointPnPPowerShellOnline  
-  Instead, check if you have a newer version already installed; if so, remove it; then install the previous version.
-  => To check if you have the issue, use the command: Connect-PnPOnline -Scopes "User.Read" 
-     If you have the issue, you get an error AADSTS70011. If you get a login prompt, it means that you don't have the issue. 
-  => To check which version is installed use the command: Get-Module -Name sharepointpnppowershell* -ListAvailable
-  => To remove any existing version use the command: Uninstall-Module SharePointPnPPowerShellOnline -AllVersions -Force"
-  => To install the previous (last working) version, use the command: "Install-Module SharePointPnPPowerShellOnline -RequiredVersion 3.25.2009.1"
-   
-  More info on https://github.com/pnp/PnP-PowerShell/issues/2983
-
   .SYNOPSIS
     This script massively writes the mobile number to be used by the Azure AD users for MFA. 
     The users (UPN) & mobile numbers are read from an input CSV file.
@@ -30,9 +17,25 @@
         * False: the mobile phone is already set (copied in the column "PhoneNumber") and was not changed
         * Not found: the user specified in the row of the input file was not found in Azure AD
     
+  .ATTENTION (UPDATE 2020.12.22)
+  The script doesn't work with the October 2020 version of PnP.PowerShell / SharePointPnPPowerShellOnline. NOTE: I haven't checked with any newer version.
+  We are investigating. While we find a solution, please use the September 2020 version of the module.
+  So, DO NOT install it by simply launching the command referenced below: Install-Module SharePointPnPPowerShellOnline  
+  Instead, check if you have a newer version already installed; if so, remove it; then install the previous version.
+  => To check if you have the issue, use the command: Connect-PnPOnline -Scopes "User.Read" 
+     If you have the issue, you get an error AADSTS70011. If you get a login prompt, it means that you don't have the issue. 
+  => To check which version is installed use the command: Get-Module -Name sharepointpnppowershell* -ListAvailable
+  => To remove any existing version use the command: Uninstall-Module SharePointPnPPowerShellOnline -AllVersions -Force"
+  => To install the previous (last working) version, use the command: "Install-Module SharePointPnPPowerShellOnline -RequiredVersion 3.25.2009.1"
+   
+  More info on https://github.com/pnp/PnP-PowerShell/issues/2983
+
   .PREREQUISITES
    * Use Windows 10 (For earlier versions of Windows, please refer to https://docs.microsoft.com/en-us/microsoft-365/enterprise/connect-to-all-microsoft-365-services-in-a-single-windows-powershell-window?view=o365-worldwide#before-you-begin)
    * If not alreayd done, install the PowerShell modules MSOnline and SharePointPnPPowerShellOnline
+   * In Azure AD, accept the request to assign permission the "UserAuthenticationMethod.Read.All" and "UserAuthenticationMethod.ReadWrite.All"
+     to the enterprise application Pnp.PowerShell (when you login to Azure AD you need to use a user with adequate rights)
+     These permissions are required by the Graph API used to set the mobile number: https://docs.microsoft.com/it-it/graph/authenticationmethods-get-started
 
     To install the PowerShell modules, open PowerShell by using the option "Run as administrator" and type:
         Set-ExecutionPolicy -ExecutionPolicy RemoteSigned 
