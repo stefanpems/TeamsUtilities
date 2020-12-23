@@ -33,7 +33,7 @@
   .PREREQUISITES
    * Use Windows 10 (For earlier versions of Windows, please refer to https://docs.microsoft.com/en-us/microsoft-365/enterprise/connect-to-all-microsoft-365-services-in-a-single-windows-powershell-window?view=o365-worldwide#before-you-begin)
    * If not alreayd done, install the PowerShell modules MSOnline and SharePointPnPPowerShellOnline
-   * In Azure AD, accept the request to assign permission the "UserAuthenticationMethod.Read.All" and "UserAuthenticationMethod.ReadWrite.All"
+   * In Azure AD, accept the request to assign the permissions "UserAuthenticationMethod.Read.All" and "UserAuthenticationMethod.ReadWrite.All"
      to the enterprise application Pnp.PowerShell (when you login to Azure AD you need to use a user with adequate rights)
      These permissions are required by the Graph API used to set the mobile number: https://docs.microsoft.com/it-it/graph/authenticationmethods-get-started
 
