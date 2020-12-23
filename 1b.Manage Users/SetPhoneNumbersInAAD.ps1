@@ -15,7 +15,7 @@
   => To remove any existing version use the command: Uninstall-Module SharePointPnPPowerShellOnline -AllVersions -Force"
   => To install the previous (last working) version, use the command: "Install-Module SharePointPnPPowerShellOnline -RequiredVersion 3.25.2009.1"
    
-  More info on https://github.com/pnp/PnP-PowerShell/issues/2983
+  More info on https://github.com/pnp/PnP-PowerShell/issues/2983 
 
   .SYNOPSIS
     This script massively writes the mobile number to be used by the Azure AD users for MFA. 
