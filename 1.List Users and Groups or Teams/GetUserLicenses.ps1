@@ -35,7 +35,7 @@
 #                                   VARIABLES TO BE SET
 ############################################################################################
 
-$ofile = "C:\ZTemp\licensesMLPS.csv" #Path of the CSV file to be generated as output (if existing, it will be overwritten)
+$ofile = "C:\ZTemp\licenses.csv" #Path of the CSV file to be generated as output (if existing, it will be overwritten)
 
 
 ############################################################################################
