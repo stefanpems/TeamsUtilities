@@ -140,7 +140,7 @@ function Get-Licenses{
                                     }
                                 }
                                 else{                                    
-                                    $UPN+";"+$LicensePlan+";Group;"+(Get-MsolGroup -ObjectId $Guid).DisplayName | Out-File $ofile -Append
+                                    $UPN+";"+$LicensePlan+";Inherited;"+(Get-MsolGroup -ObjectId $Guid).DisplayName | Out-File $ofile -Append
                                 }
 
                             }
