@@ -17,7 +17,8 @@
 
   .NOTES
   Please modify the Get-LicensePlan() function to add your preferred renaming of the service plans.
-  The complete list is here: https://docs.microsoft.com/en-us/azure/active-directory/enterprise-users/licensing-service-plan-reference
+  The complete list for Enterprise customer is here: https://docs.microsoft.com/en-us/azure/active-directory/enterprise-users/licensing-service-plan-reference
+  For EDU customer is here: https://docs.microsoft.com/en-us/MicrosoftTeams/sku-reference-edu
 
   .PREREQUISITES
   * Use Windows 10 (For earlier versions of Windows, please refer to https://docs.microsoft.com/en-us/microsoft-365/enterprise/connect-to-all-microsoft-365-services-in-a-single-windows-powershell-window?view=o365-worldwide#before-you-begin)
