@@ -1,9 +1,10 @@
 ﻿<#
   The use of this script is now DEPRECATED!
   Use GetUsersAndBelongingGroups.ps1 instead.
+  THIS SCRIPT IS STILL USEFUL ONLY TO GET THE LIST OF THE EMPTY GROUPS
 
   .VERSION AND AUTHOR
-    Script version: v-2020.05.06
+    Script version: v-2021.05.01
     Author: Stefano Pescosolido, https://www.linkedin.com/in/stefanopescosolido/
     Script published in GitHub: https://github.com/stefanpems/TeamsUtilities
 
@@ -43,21 +44,26 @@ $adminName = "nomeutente@nomescuola.edu.it" #This is just a sample
 $LogStartTime = Get-Date -Format "yyyy-MM-dd_hh.mm.ss"
 
 $outUsersCsvFilePath = "$outCsvDirPath\DumpTeams_Results_$LogStartTime.csv"
+$outOrphanGroupsCsvFilePath = "$outCsvDirPath\DumpOrphanTeams_Results_$LogStartTime.csv"
 If (Test-Path $outUsersCsvFilePath){
 	Remove-Item $outUsersCsvFilePath
 }
-'"TeamNickName","TeamDisplayName","UserPrincipalName","UserType"' | Out-File $outUsersCsvFilePath
+'"GroupNickName","GroupDisplayName","UserPrincipalName","UserType"' | Out-File $outUsersCsvFilePath
+'"GroupNickName","GroupDisplayName","ObjectType","DirSyncEnabled","MailEnabled","SecurityEnabled"' | Out-File $outOrphanGroupsCsvFilePath
 
 Connect-AzureAD -AccountId $adminName 
 
 Get-AzureADGroup -All $true | ForEach-Object{
     $g = $_
     
+    $orphan = $true
+
     $ow = Get-AzureADGroupOwner  -ObjectId $g.ObjectId 
 
     $a = New-Object -TypeName "System.Collections.ArrayList"
 
     if($ow.Count -gt 0){
+        $orphan = $false
         if($ow.Count -eq 1){
             $a.Add($ow.UserPrincipalName)|Out-Null
             Write-Host $g.MailNickName " - " $g.DisplayName " - " $ow.UserPrincipalName " - Owner" -ForegroundColor Magenta
@@ -72,7 +78,16 @@ Get-AzureADGroup -All $true | ForEach-Object{
         }
     }
     
-    Get-AzureADGroupMember -ObjectId $g.ObjectId | ForEach-Object{
+
+    $og = Get-AzureADGroupMember -ObjectId $g.ObjectId
+
+
+    if($og.Count -gt 0){
+        $orphan = $false
+    }
+
+    
+    $og | ForEach-Object{
         if(-not($a.Contains($_.UserPrincipalName))){
             Write-Host $g.MailNickName " - " $g.DisplayName " - " $_.UserPrincipalName " - Member" -ForegroundColor Green
             '"'+$g.MailNickName+'","'+$g.DisplayName+'","'+$_.UserPrincipalName+'","Member"' | Out-File $outUsersCsvFilePath -Append
@@ -81,6 +96,13 @@ Get-AzureADGroup -All $true | ForEach-Object{
             Write-Host "Skipped " $g.MailNickName " - " $g.DisplayName " - " $_.UserPrincipalName " - Member (Already Owner)" -ForegroundColor Gray
         }
     }
+
+    if($orphan){
+        Write-Host "Empty group: " $g.MailNickName "," $g.DisplayName "," $g.ObjectType "," $g.DirSyncEnabled "," $g.MailEnabled "," $g.SecurityEnabled -ForegroundColor Cyan 
+        '"'+$g.MailNickName+'","'+$g.DisplayName+'","'+$g.ObjectType+'","'+$g.DirSyncEnabled+'","'+$g.MailEnabled+'","'+$g.SecurityEnabled+'"'  | Out-File $outOrphanGroupsCsvFilePath -Append
+    }
+
+
 }
 
-Write-Host "Generato il file " $outUsersCsvFilePath
+Write-Host "Generato i file " $outUsersCsvFilePath " e " $outOrphanGroupsCsvFilePath
